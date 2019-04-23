@@ -1,105 +1,66 @@
 from rest_framework import generics, viewsets, status
 from django.db.models import Q
-from .db.models import Flight, FlightTracker
-from .serializers import FlightSerializer, FlightTrackerSerializer
+from .db.models import *
+from .serializers import *
 from rest_framework.response import Response
+import json
 
-class FlightCreateView(generics.CreateAPIView):
-    lookup_field = 'id'
+class FlightCreateView(generics.ListCreateAPIView):
+    queryset = Flight.objects.all()
     serializer_class = FlightSerializer
 
-    def get_queryset(self):
-        return Flight.objects.all()
+class SpeedDataCreateView(generics.ListCreateAPIView):
+    queryset = SpeedData.objects.all()
+    serializer_class = SpeedDataSerializer
 
-class FlightViewSet(viewsets.ViewSet):
-    def retrieve(self, request, id=None):
-        curr = Flight.objects.get(id=id)
-        if curr:
-            return Response(curr.as_dict_response(), status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response({"object": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+class PositionDataCreateView(generics.ListCreateAPIView):
+    queryset = PositionData.objects.all()
+    serializer_class = PositionDataSerializer
 
-    def update(self, request, id=None):
-        incoming = request.data
-        obj = Flight.objects.filter(id=id).update(**incoming)
-    
-        if obj == 1:
-            return Response({"success": 'driod found and updated'}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": 'these are not the driods you are looking for'}, status=status.HTTP_400_BAD_REQUEST)
-       
-    def partial_update(self, request, id=None):
-        incoming = request.data
-        obj = Flight.objects.filter(id=id).update(**incoming)
-    
-        if obj == 1:
-            return Response({"success": 'driod found and updated'}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": 'these are not the driods you are looking for'}, status=status.HTTP_400_BAD_REQUEST)
+class HoopsBundleCreateView(generics.ListCreateAPIView):
+    queryset = HoopsBundle.objects.all()
+    serializer_class = HoopsBundleSerializer
 
-    def destroy(self, request, id=None):
-        instance = Flight.objects.get(id=id)
+class HoopDataCreateView(generics.ListCreateAPIView):
+    queryset = HoopData.objects.all()
+    serializer_class = HoopDataSerializer
 
-        if instance:
-            instance.delete()
-            return Response({"destroyed": True}, status=status.HTTP_200_OK)
-        else:
-            return Response({"object": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+class AsteriodsBundleCreateView(generics.ListCreateAPIView):
+    queryset = AsteriodsBundle.objects.all()
+    serializer_class = AsteriodsBundleSerializer
+
+class AsteriodDataCreateView(generics.ListCreateAPIView):
+    queryset = AsteriodData.objects.all()
+    serializer_class = AsteriodDataSerializer
+
+class FlightMassView(viewsets.ViewSet):
+    def retrieve(self, request, flight_id=None):
+        flight = Flight.objects.filter(id=flight_id).prefetch_related("speed", "position", "hoops", "asteriods").first()
+        
+        wrapper = {}
+
+        wrapper['flight'] = flight.as_dict_response()
+        wrapper['speed'] = [item.as_dict_response() for item in flight.speed.all()]
+        wrapper['position'] = [item.as_dict_response() for item in flight.position.all()]
+        wrapper['asteriod_bundles'] = [item.as_dict_response() for item in flight.asteriods.all()]
+        wrapper['hoop_bundles'] = [item.as_dict_response() for item in flight.hoops.all()]
+        
+        asteriodBundle = wrapper['asteriod_bundles'] 
+        for i in range(len(asteriodBundle)):
+            asteriods = AsteriodData.objects.filter(asteriod_id=asteriodBundle[i]["id"])
+            wrapper['asteriod_bundles'][i]['asteriods'] = []
+            for j in range(len(asteriods)):
+                wrapper['asteriod_bundles'][i]['asteriods'].append(asteriods[j].as_dict_response())
+
+        hoopBundle = wrapper['hoop_bundles'] 
+        for i in range(len(hoopBundle)):
+            hoops = HoopData.objects.filter(hoop_id=hoopBundle[i]["id"])
+            wrapper['hoop_bundles'][i]['hoops'] = []
+            for j in range(len(hoops)):
+                wrapper['hoop_bundles'][i]['hoops'].append(hoops[j].as_dict_response())
+
+        return Response(wrapper, status=status.HTTP_202_ACCEPTED)
 
 class FlightAllView(viewsets.ModelViewSet):
     queryset = Flight.objects.all()
     serializer_class = FlightSerializer
-
-class FlightTrackerCreateView(generics.CreateAPIView):
-    lookup_field = 'id'
-    serializer_class = FlightTrackerSerializer
-
-    def get_queryset(self):
-        return FlightTracker.objects.all()
-
-
-class FlightDataAllView(viewsets.ModelViewSet):
-    lookup_field = 'flight_id'
-    serializer_class = FlightTrackerSerializer
-
-    def get_queryset(self):
-        return FlightTracker.objects.all()
-
-class FlightTrackerViewSet(viewsets.ViewSet):
-    def retrieve(self, request, id=None):
-        curr = FlightTracker.objects.get(id=id)
-        if curr:
-            return Response(curr.as_dict_response(), status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response({"object": "not_found"}, status=status.HTTP_404_NOT_FOUND)
-
-    def update(self, request, id=None):
-        incoming = request.data
-        obj = FlightTracker.objects.filter(id=id).update(**incoming)
-    
-        if obj == 1:
-            return Response({"success": 'driod found and updated'}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": 'these are not the driods you are looking for'}, status=status.HTTP_400_BAD_REQUEST)
-       
-    def partial_update(self, request, id=None):
-        incoming = request.data
-        obj = FlightTracker.objects.filter(id=id).update(**incoming)
-    
-        if obj == 1:
-            return Response({"success": 'driod found and updated'}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": 'these are not the driods you are looking for'}, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, id=None):
-        instance = FlightTracker.objects.get(id=id)
-
-        if instance:
-            instance.delete()
-            return Response({"destroyed": True}, status=status.HTTP_200_OK)
-        else:
-            return Response({"object": "not_found"}, status=status.HTTP_404_NOT_FOUND)
-
-class FlightTrackerAllView(viewsets.ModelViewSet):
-    queryset = FlightTracker.objects.all()
-    serializer_class = FlightTrackerSerializer
